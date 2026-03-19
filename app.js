@@ -32,11 +32,11 @@ let unsubMessages   = null;
 
 // ─── CHANNELS ────────────────────────────────────────────────
 const CHANNELS = [
-  { id: "general",       icon: "💬", label: "general" },
-  { id: "coding",        icon: "💻", label: "coding" },
-  { id: "announcements", icon: "📢", label: "announcements" },
-  { id: "random",        icon: "🎲", label: "random" },
-  { id: "design",        icon: "🎨", label: "design" },
+  { id: "general",       icon: "💬", label: "general",       desc: "General team discussion" },
+  { id: "announcements", icon: "📢", label: "announcements", desc: "Important company updates" },
+  { id: "coding",        icon: "💻", label: "coding",        desc: "Dev talk, code reviews, help" },
+  { id: "design",        icon: "🎨", label: "design",        desc: "UI/UX, assets, feedback" },
+  { id: "random",        icon: "🎲", label: "random",        desc: "Off-topic, fun, anything goes" },
 ];
 
 // ─── DOM REFS ─────────────────────────────────────────────────
@@ -201,7 +201,9 @@ function switchChannel(channelId) {
 
   const ch = CHANNELS.find(c => c.id === channelId);
   channelTitle.innerHTML = `<span class="ch-title-icon">${ch.icon}</span> #${ch.label}`;
-  messageInput.placeholder = `Message #${ch.label}`;
+  messageInput.placeholder = `Message #${ch.label}…`;
+  const descEl = document.getElementById("channel-desc");
+  if (descEl) descEl.textContent = ch.desc || "";
 
   messagesArea.innerHTML = "";
   if (unsubMessages) unsubMessages();

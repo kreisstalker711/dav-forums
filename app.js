@@ -1,6 +1,6 @@
 // ============================================================
-// app.js — ChatCorp Main Logic
-// Fixed: real-time messages, DM search button, cross-account sync
+// app.js — Main application logic
+// Features: Auth, Channel Chat, Direct Messages (DMs)
 // ============================================================
 
 import {
@@ -23,12 +23,12 @@ import {
 } from "./firebase.js";
 
 // ─── STATE ───────────────────────────────────────────────────
-let currentUser    = null;
-let activeChannel  = "general";
-let activeDMUserId = null;
-let activeDMName   = null;
-let chatMode       = "channel";
-let unsubMessages  = null;
+let currentUser     = null;
+let activeChannel   = "general";
+let activeDMUserId  = null;   // uid of person we're DMing
+let activeDMName    = null;   // display name of person we're DMing
+let chatMode        = "channel"; // "channel" | "dm"
+let unsubMessages   = null;
 
 // ─── CHANNELS ────────────────────────────────────────────────
 const CHANNELS = [
@@ -51,7 +51,6 @@ const signupError   = document.getElementById("signup-error");
 const channelList   = document.getElementById("channel-list");
 const dmList        = document.getElementById("dm-list");
 const channelTitle  = document.getElementById("channel-title");
-const channelDesc   = document.getElementById("channel-desc");
 const messagesArea  = document.getElementById("messages-area");
 const messageInput  = document.getElementById("message-input");
 const sendBtn       = document.getElementById("send-btn");
@@ -91,7 +90,7 @@ loginForm.addEventListener("submit", async (e) => {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
     loginError.textContent = friendlyError(err.code);
-    btn.textContent = "Sign In →";
+    btn.textContent = "Sign In";
     btn.disabled = false;
   }
 });
@@ -106,7 +105,7 @@ signupForm.addEventListener("submit", async (e) => {
   const btn      = signupForm.querySelector("button[type=submit]");
 
   if (!username || username.length < 2) {
-    signupError.textContent = "Display name must be at least 2 characters.";
+    signupError.textContent = "Username must be at least 2 characters.";
     return;
   }
   btn.textContent = "Creating account…";
@@ -114,16 +113,16 @@ signupForm.addEventListener("submit", async (e) => {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName: username });
-    // Save user to Firestore so others can search and DM them
+    // Save user profile to Firestore so others can find them
     await setDoc(doc(db, "users", cred.user.uid), {
-      uid:      cred.user.uid,
-      username: username,
-      email:    email,
+      uid: cred.user.uid,
+      username,
+      email,
       createdAt: serverTimestamp(),
     });
   } catch (err) {
     signupError.textContent = friendlyError(err.code);
-    btn.textContent = "Create Account →";
+    btn.textContent = "Create Account";
     btn.disabled = false;
   }
 });
@@ -138,19 +137,15 @@ logoutBtn.addEventListener("click", async () => {
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
-    // Create user doc if it doesn't exist yet (handles old accounts)
-    try {
-      const uDoc = await getDoc(doc(db, "users", user.uid));
-      if (!uDoc.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          uid:      user.uid,
-          username: user.displayName || user.email.split("@")[0],
-          email:    user.email,
-          createdAt: serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      console.warn("Could not sync user doc:", e);
+    // Ensure user doc exists (for users who signed up before DM feature)
+    const uDoc = await getDoc(doc(db, "users", user.uid));
+    if (!uDoc.exists()) {
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        username: user.displayName || user.email.split("@")[0],
+        email: user.email,
+        createdAt: serverTimestamp(),
+      });
     }
     showApp(user);
   } else {
@@ -178,7 +173,7 @@ function showAuth() {
   signupForm.reset();
 }
 
-// ─── BUILD CHANNEL LIST ───────────────────────────────────────
+// ─── CHANNEL LIST ─────────────────────────────────────────────
 function buildChannelList() {
   channelList.innerHTML = "";
   CHANNELS.forEach(({ id, icon, label }) => {
@@ -193,8 +188,8 @@ function buildChannelList() {
 
 // ─── SWITCH CHANNEL ───────────────────────────────────────────
 function switchChannel(channelId) {
-  chatMode       = "channel";
-  activeChannel  = channelId;
+  chatMode      = "channel";
+  activeChannel = channelId;
   activeDMUserId = null;
 
   document.querySelectorAll(".channel-item").forEach(el =>
@@ -205,9 +200,11 @@ function switchChannel(channelId) {
   );
 
   const ch = CHANNELS.find(c => c.id === channelId);
-  channelTitle.innerHTML = `<span>${ch.icon}</span> #${ch.label}`;
-  messageInput.placeholder = `Message #${ch.label}…`;
-  if (channelDesc) channelDesc.textContent = ch.desc || "";
+  channelTitle.innerHTML = `<span class="ch-title-icon">${ch.icon}</span> #${ch.label}`;
+  messageInput.placeholder = `Message #${ch.label}`;
+
+  const descEl = document.getElementById("channel-desc");
+  if (descEl) descEl.textContent = ch.desc || "";
 
   messagesArea.innerHTML = "";
   if (unsubMessages) unsubMessages();
@@ -215,50 +212,41 @@ function switchChannel(channelId) {
   messageInput.focus();
 }
 
-// ─── SUBSCRIBE CHANNEL MESSAGES (real-time) ───────────────────
+// ─── CHANNEL MESSAGES ─────────────────────────────────────────
 function subscribeChannelMessages(channelId) {
   const q = query(
     collection(db, "channels", channelId, "messages"),
     orderBy("timestamp", "asc")
   );
-  // onSnapshot fires immediately with existing messages,
-  // then again whenever anyone sends a new one
   unsubMessages = onSnapshot(q, (snap) => {
     snap.docChanges().forEach(change => {
-      if (change.type === "added") {
-        renderMessage(change.doc.data(), change.doc.id, "channel");
-      }
+      if (change.type === "added") renderMessage(change.doc.data(), change.doc.id, "channel");
     });
     scrollToBottom();
-  }, (err) => {
-    console.error("Channel listener error:", err);
-    showToast("Connection error. Check your Firestore rules.");
   });
 }
 
-// ─── LOAD DM LIST ─────────────────────────────────────────────
+// ─── DM LIST ─────────────────────────────────────────────────
 async function loadDMList() {
-  dmList.innerHTML = `<li class="dm-placeholder">Search a teammate to start a conversation</li>`;
+  dmList.innerHTML = `<li class="dm-placeholder">Search a username above to start a DM</li>`;
   try {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "dmConversations"));
     if (!snap.empty) {
       dmList.innerHTML = "";
       snap.forEach(d => {
         const data = d.data();
-        if (data.uid && data.username) addDMItem(data.uid, data.username);
+        addDMItem(data.uid, data.username);
       });
     }
   } catch (e) {
-    console.warn("Could not load DM list:", e);
+    // no conversations yet
   }
 }
 
-// ─── ADD DM ITEM TO SIDEBAR ───────────────────────────────────
 function addDMItem(uid, username) {
   const placeholder = dmList.querySelector(".dm-placeholder");
   if (placeholder) placeholder.remove();
 
-  // Avoid duplicates
   if (document.querySelector(`[data-dmuid="${uid}"]`)) return;
 
   const li = document.createElement("li");
@@ -274,15 +262,13 @@ function addDMItem(uid, username) {
 
 // ─── DM SEARCH ───────────────────────────────────────────────
 dmSearchBtn.addEventListener("click", searchUser);
-dmSearchInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") searchUser();
-});
+dmSearchInput.addEventListener("keydown", e => { if (e.key === "Enter") searchUser(); });
 
 async function searchUser() {
-  const queryStr = dmSearchInput.value.trim();
-  if (!queryStr) return;
+  const query_str = dmSearchInput.value.trim();
+  if (!query_str) return;
 
-  // Disable button while searching (keep SVG icon intact)
+  // disable button without breaking SVG icon
   dmSearchBtn.disabled = true;
   dmSearchBtn.style.opacity = "0.5";
 
@@ -292,7 +278,7 @@ async function searchUser() {
     snap.forEach(d => {
       const data = d.data();
       if (
-        data.username?.toLowerCase() === queryStr.toLowerCase() &&
+        data.username?.toLowerCase() === query_str.toLowerCase() &&
         data.uid !== currentUser.uid
       ) {
         found = data;
@@ -301,7 +287,6 @@ async function searchUser() {
 
     if (found) {
       dmSearchInput.value = "";
-      // Save conversation to both users' dmConversations
       await setDoc(
         doc(db, "users", currentUser.uid, "dmConversations", found.uid),
         { uid: found.uid, username: found.username }
@@ -309,10 +294,9 @@ async function searchUser() {
       addDMItem(found.uid, found.username);
       openDM(found.uid, found.username);
     } else {
-      showToast(`No user found: "${queryStr}"`);
+      showToast(`No user found: "${query_str}"`);
     }
   } catch (err) {
-    console.error("Search error:", err);
     showToast("Search failed. Try again.");
   }
 
@@ -320,7 +304,7 @@ async function searchUser() {
   dmSearchBtn.style.opacity = "1";
 }
 
-// ─── OPEN DM CONVERSATION ─────────────────────────────────────
+// ─── OPEN DM ─────────────────────────────────────────────────
 async function openDM(uid, username) {
   chatMode       = "dm";
   activeDMUserId = uid;
@@ -331,39 +315,31 @@ async function openDM(uid, username) {
     el.classList.toggle("active", el.dataset.dmuid === uid)
   );
 
-  channelTitle.innerHTML = `
-    <div class="dm-header-avatar">${username.charAt(0).toUpperCase()}</div>
-    ${escapeHtml(username)}
-  `;
-  messageInput.placeholder = `Message ${username}…`;
-  if (channelDesc) channelDesc.textContent = "Direct Message";
+  channelTitle.innerHTML = `<div class="dm-header-avatar">${username.charAt(0).toUpperCase()}</div> ${escapeHtml(username)}`;
+  messageInput.placeholder = `Message ${username}`;
+
+  const descEl = document.getElementById("channel-desc");
+  if (descEl) descEl.textContent = "Direct Message";
 
   messagesArea.innerHTML = "";
   if (unsubMessages) unsubMessages();
   subscribeDMMessages(uid);
   messageInput.focus();
 
-  // Save conversation on the other user's side too
-  try {
-    await setDoc(
-      doc(db, "users", uid, "dmConversations", currentUser.uid),
-      {
-        uid:      currentUser.uid,
-        username: currentUser.displayName || currentUser.email.split("@")[0],
-      }
-    );
-  } catch (e) {
-    console.warn("Could not save reverse DM ref:", e);
-  }
+  await setDoc(
+    doc(db, "users", uid, "dmConversations", currentUser.uid),
+    {
+      uid: currentUser.uid,
+      username: currentUser.displayName || currentUser.email.split("@")[0]
+    }
+  );
 }
 
-// ─── DM ROOM ID ───────────────────────────────────────────────
-// Always sorted so both users get the same room
+// ─── DM MESSAGES ─────────────────────────────────────────────
 function getDMRoomId(uid1, uid2) {
   return [uid1, uid2].sort().join("_");
 }
 
-// ─── SUBSCRIBE DM MESSAGES (real-time) ────────────────────────
 function subscribeDMMessages(otherUid) {
   const roomId = getDMRoomId(currentUser.uid, otherUid);
   const q = query(
@@ -372,14 +348,9 @@ function subscribeDMMessages(otherUid) {
   );
   unsubMessages = onSnapshot(q, (snap) => {
     snap.docChanges().forEach(change => {
-      if (change.type === "added") {
-        renderMessage(change.doc.data(), change.doc.id, "dm");
-      }
+      if (change.type === "added") renderMessage(change.doc.data(), change.doc.id, "dm");
     });
     scrollToBottom();
-  }, (err) => {
-    console.error("DM listener error:", err);
-    showToast("Connection error. Check your Firestore rules.");
   });
 }
 
@@ -395,38 +366,34 @@ async function sendMessage() {
   try {
     if (chatMode === "channel") {
       await addDoc(collection(db, "channels", activeChannel, "messages"), {
-        username:  username,
-        uid:       currentUser.uid,
-        text:      text,
+        username,
+        uid: currentUser.uid,
+        text,
         timestamp: serverTimestamp(),
       });
     } else if (chatMode === "dm" && activeDMUserId) {
       const roomId = getDMRoomId(currentUser.uid, activeDMUserId);
       await addDoc(collection(db, "dms", roomId, "messages"), {
-        username:  username,
-        uid:       currentUser.uid,
-        text:      text,
+        username,
+        uid: currentUser.uid,
+        text,
         timestamp: serverTimestamp(),
       });
     }
   } catch (err) {
     console.error("Send failed:", err);
-    showToast("Failed to send. Check connection.");
-    messageInput.value = text; // restore on failure
+    messageInput.value = text;
   }
 }
 
-// Send on Enter, new line on Shift+Enter
 messageInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     sendMessage();
   }
 });
-
 sendBtn.addEventListener("click", sendMessage);
 
-// Auto-resize textarea
 messageInput.addEventListener("input", () => {
   messageInput.style.height = "auto";
   messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
@@ -434,67 +401,60 @@ messageInput.addEventListener("input", () => {
 
 // ─── RENDER MESSAGE ───────────────────────────────────────────
 function renderMessage(data, docId, type) {
-  // Prevent duplicate renders
   if (document.getElementById(`msg-${docId}`)) return;
 
   const { username, text, timestamp, uid } = data;
-  const time   = timestamp ? formatTime(timestamp.toDate()) : "just now";
-  const isOwn  = uid === currentUser?.uid;
-  const color  = hashCode(username || "?") % 6;
+  const time  = timestamp ? formatTime(timestamp.toDate()) : "just now";
+  const isOwn = uid === currentUser?.uid;
 
   const div = document.createElement("div");
   div.id = `msg-${docId}`;
-  div.className = `message${isOwn ? " own" : ""}`;
+  div.className = `message ${isOwn ? "own" : ""}`;
+
+  const colorIndex = hashCode(username || "?") % 6;
+  const avatarClass = `avatar-color-${colorIndex}`;
+
   div.innerHTML = `
-    <div class="msg-avatar avatar-color-${color}">${(username || "?").charAt(0).toUpperCase()}</div>
+    <div class="msg-avatar ${avatarClass}">${(username || "?").charAt(0).toUpperCase()}</div>
     <div class="msg-body">
       <div class="msg-header">
-        <span class="msg-username${isOwn ? " own-name" : ""}">${escapeHtml(username)}</span>
+        <span class="msg-username ${isOwn ? "own-name" : ""}">${escapeHtml(username)}</span>
         <span class="msg-time">${time}</span>
-        ${type === "channel" && !isOwn
-          ? `<button class="dm-quick-btn" data-uid="${uid}" data-uname="${escapeHtml(username)}">✉ DM</button>`
-          : ""}
+        ${type === "channel" && !isOwn ? `<button class="dm-quick-btn" data-uid="${uid}" data-name="${escapeHtml(username)}" title="Send DM">✉</button>` : ""}
       </div>
       <div class="msg-text">${formatText(text)}</div>
     </div>
   `;
 
-  // Quick DM from channel message
   const dmBtn = div.querySelector(".dm-quick-btn");
   if (dmBtn) {
-    dmBtn.addEventListener("click", async () => {
-      const tUid  = dmBtn.dataset.uid;
-      const tName = dmBtn.dataset.uname;
-      await setDoc(
-        doc(db, "users", currentUser.uid, "dmConversations", tUid),
-        { uid: tUid, username: tName }
+    dmBtn.addEventListener("click", () => {
+      openDM(dmBtn.dataset.uid, dmBtn.dataset.name);
+      addDMItem(dmBtn.dataset.uid, dmBtn.dataset.name);
+      setDoc(
+        doc(db, "users", currentUser.uid, "dmConversations", dmBtn.dataset.uid),
+        { uid: dmBtn.dataset.uid, username: dmBtn.dataset.name }
       );
-      addDMItem(tUid, tName);
-      openDM(tUid, tName);
     });
   }
 
   messagesArea.appendChild(div);
-  // Animate in
   requestAnimationFrame(() => div.classList.add("visible"));
 }
 
-// ─── AUTO SCROLL ──────────────────────────────────────────────
+// ─── SCROLL ───────────────────────────────────────────────────
 function scrollToBottom() {
   messagesArea.scrollTo({ top: messagesArea.scrollHeight, behavior: "smooth" });
 }
 
-// ─── TOAST NOTIFICATION ───────────────────────────────────────
+// ─── TOAST ────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.createElement("div");
   t.className = "toast";
   t.textContent = msg;
   document.body.appendChild(t);
   requestAnimationFrame(() => t.classList.add("show"));
-  setTimeout(() => {
-    t.classList.remove("show");
-    setTimeout(() => t.remove(), 300);
-  }, 3000);
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 3000);
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -513,10 +473,8 @@ function formatText(str) {
 
 function escapeHtml(str) {
   return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -536,8 +494,6 @@ function friendlyError(code) {
 
 function hashCode(str) {
   let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = Math.imul(31, h) + str.charCodeAt(i) | 0;
-  }
+  for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
   return Math.abs(h);
 }

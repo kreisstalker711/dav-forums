@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forge — Community Chat</title>
+
+  <!-- Favicon emoji fallback -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       AUTH SCREEN
+  ══════════════════════════════════════════ -->
+  <div id="auth-screen">
+    <div class="auth-card">
+
+      <!-- Logo -->
+      <div class="auth-logo">
+        <div class="auth-logo-icon">⚡</div>
+        <h1>Forge</h1>
+      </div>
+
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login">Sign In</button>
+        <button class="auth-tab" id="tab-signup">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <form class="auth-form active" id="login-form" novalidate>
+        <div class="form-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required />
+        </div>
+        <p class="auth-error" id="login-error"></p>
+        <button type="submit" class="auth-submit">Sign In</button>
+      </form>
+
+      <!-- Signup Form -->
+      <form class="auth-form" id="signup-form" novalidate>
+        <div class="form-group">
+          <label for="signup-username">Username</label>
+          <input type="text" id="signup-username" placeholder="CoolDeveloper" maxlength="32" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label for="signup-email">Email</label>
+          <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" placeholder="Min 6 characters" autocomplete="new-password" required />
+        </div>
+        <p class="auth-error" id="signup-error"></p>
+        <button type="submit" class="auth-submit">Create Account</button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       APP SCREEN
+  ══════════════════════════════════════════ -->
+  <div id="app-screen" class="hidden">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+
+      <!-- Server Name -->
+      <div class="server-header">
+        <div class="server-logo">⚡</div>
+        <span class="server-name">Forge Community</span>
+      </div>
+
+      <!-- Channels -->
+      <div class="channel-section">
+        <div class="channel-section-label">
+          <span>Text Channels</span>
+          <span>+</span>
+        </div>
+        <ul id="channel-list"></ul>
+      </div>
+
+      <!-- User Panel -->
+      <div class="user-panel">
+        <div class="user-avatar-wrap">
+          <div id="user-avatar">?</div>
+          <div class="status-dot"></div>
+        </div>
+        <div class="user-info">
+          <span id="user-display">Loading…</span>
+          <span class="user-tag">● Online</span>
+        </div>
+        <button id="logout-btn" title="Sign out">⏻</button>
+      </div>
+
+    </aside>
+
+    <!-- ── CHAT MAIN ── -->
+    <main class="chat-main">
+
+      <!-- Header -->
+      <div class="chat-header">
+        <span id="channel-title">#general</span>
+        <div class="header-divider"></div>
+        <span class="header-topic">Welcome to Forge — a real-time community chat.</span>
+        <div class="header-actions">
+          <button class="header-action-btn" title="Search">🔍</button>
+          <button class="header-action-btn" title="Members">👥</button>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div id="messages-area">
+        <!-- Welcome Banner (shown at top of channel) -->
+        <div class="welcome-banner">
+          <span class="welcome-icon">⚡</span>
+          <h2>Welcome to Forge</h2>
+          <p>This is the beginning of the conversation. Say hello!</p>
+        </div>
+        <!-- Messages are injected here by app.js -->
+      </div>
+
+      <!-- Typing indicator + Input bar -->
+      <div class="input-area">
+        <div id="typing-indicator"></div>
+        <div class="input-bar">
+          <textarea
+            id="message-input"
+            placeholder="Message #general"
+            rows="1"
+            autocomplete="off"
+            spellcheck="true"
+          ></textarea>
+          <button id="send-btn" title="Send message">➤</button>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- ── App entry (ES modules) ── -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>

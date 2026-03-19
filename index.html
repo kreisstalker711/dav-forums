@@ -4,11 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Forge — Community Chat</title>
-
-  <!-- Favicon emoji fallback -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
-
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -19,19 +15,17 @@
   <div id="auth-screen">
     <div class="auth-card">
 
-      <!-- Logo -->
       <div class="auth-logo">
         <div class="auth-logo-icon">⚡</div>
         <h1>Forge</h1>
       </div>
 
-      <!-- Tabs -->
       <div class="auth-tabs">
         <button class="auth-tab active" id="tab-login">Sign In</button>
         <button class="auth-tab" id="tab-signup">Sign Up</button>
       </div>
 
-      <!-- Login Form -->
+      <!-- Login -->
       <form class="auth-form active" id="login-form" novalidate>
         <div class="form-group">
           <label for="login-email">Email</label>
@@ -45,7 +39,7 @@
         <button type="submit" class="auth-submit">Sign In</button>
       </form>
 
-      <!-- Signup Form -->
+      <!-- Sign Up -->
       <form class="auth-form" id="signup-form" novalidate>
         <div class="form-group">
           <label for="signup-username">Username</label>
@@ -74,19 +68,37 @@
     <!-- ── SIDEBAR ── -->
     <aside class="sidebar">
 
-      <!-- Server Name -->
       <div class="server-header">
         <div class="server-logo">⚡</div>
         <span class="server-name">Forge Community</span>
       </div>
 
-      <!-- Channels -->
-      <div class="channel-section">
-        <div class="channel-section-label">
-          <span>Text Channels</span>
-          <span>+</span>
-        </div>
+      <div class="sidebar-scroll">
+
+        <!-- Channels -->
+        <div class="sidebar-section-label">Text Channels</div>
         <ul id="channel-list"></ul>
+
+        <!-- Direct Messages -->
+        <div class="sidebar-section-label" style="margin-top:10px;">Direct Messages</div>
+
+        <!-- DM Search -->
+        <div class="dm-search-row">
+          <input
+            type="text"
+            id="dm-search"
+            placeholder="Find user…"
+            maxlength="32"
+            autocomplete="off"
+          />
+          <button id="dm-search-btn" title="Start DM">→</button>
+        </div>
+
+        <!-- DM List -->
+        <ul id="dm-list">
+          <li class="dm-placeholder">Search a username above to start a DM</li>
+        </ul>
+
       </div>
 
       <!-- User Panel -->
@@ -107,31 +119,19 @@
     <!-- ── CHAT MAIN ── -->
     <main class="chat-main">
 
-      <!-- Header -->
       <div class="chat-header">
-        <span id="channel-title">#general</span>
-        <div class="header-divider"></div>
-        <span class="header-topic">Welcome to Forge — a real-time community chat.</span>
-        <div class="header-actions">
-          <button class="header-action-btn" title="Search">🔍</button>
-          <button class="header-action-btn" title="Members">👥</button>
-        </div>
+        <span id="channel-title">💬 #general</span>
       </div>
 
-      <!-- Messages -->
       <div id="messages-area">
-        <!-- Welcome Banner (shown at top of channel) -->
         <div class="welcome-banner">
           <span class="welcome-icon">⚡</span>
           <h2>Welcome to Forge</h2>
-          <p>This is the beginning of the conversation. Say hello!</p>
+          <p>Chat in channels or send direct messages to individuals.</p>
         </div>
-        <!-- Messages are injected here by app.js -->
       </div>
 
-      <!-- Typing indicator + Input bar -->
       <div class="input-area">
-        <div id="typing-indicator"></div>
         <div class="input-bar">
           <textarea
             id="message-input"
@@ -140,7 +140,7 @@
             autocomplete="off"
             spellcheck="true"
           ></textarea>
-          <button id="send-btn" title="Send message">➤</button>
+          <button id="send-btn" title="Send">➤</button>
         </div>
       </div>
 
@@ -148,8 +148,6 @@
 
   </div>
 
-  <!-- ── App entry (ES modules) ── -->
   <script type="module" src="app.js"></script>
-
 </body>
 </html>

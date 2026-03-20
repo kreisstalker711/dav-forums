@@ -44,8 +44,6 @@
         </div>
         <p class="auth-error" id="login-error"></p>
         <button type="submit" class="auth-submit">Sign In →</button>
-
-
       </form>
 
       <!-- Sign Up -->
@@ -67,10 +65,8 @@
       </form>
 
       <p class="auth-footer">By signing in, you agree to our Terms of Service</p>
-
     </div>
 
-    <!-- Background decoration -->
     <div class="auth-bg-circles">
       <div class="circle c1"></div>
       <div class="circle c2"></div>
@@ -83,30 +79,71 @@
   ══════════════════════════════════════════ -->
   <div id="app-screen" class="hidden">
 
+    <!-- ── SERVER RAIL (far left) ── -->
+    <nav class="server-rail">
+      <!-- Server icons (populated by JS) -->
+      <div id="server-list" class="server-icon-list"></div>
+
+      <div class="server-rail-divider"></div>
+
+      <!-- Create server button -->
+      <button id="create-server-btn" class="server-icon-btn create-btn" title="Create a Server">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </nav>
+
     <!-- ── SIDEBAR ── -->
     <aside class="sidebar">
 
-      <!-- Logo -->
+      <!-- Server Name Header -->
       <div class="server-header">
         <div class="server-logo">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white"/>
           </svg>
         </div>
-        <div>
-          <span class="server-name">ChatCorp</span>
+        <div style="flex:1;min-width:0;">
+          <span class="server-name" id="server-header-name">ChatCorp</span>
           <span class="server-subtitle">Team Workspace</span>
         </div>
+        <!-- Invite button (owner only, shown by JS) -->
+        <button id="invite-btn" class="invite-icon-btn" title="Invite members" style="display:none;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+            <line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
 
       <div class="sidebar-scroll">
 
-        <!-- Channels -->
-        <div class="sidebar-section-label">
-          <span>Channels</span>
-          <span class="section-count" id="channel-count">5</span>
+        <!-- No server state -->
+        <div id="no-server-view" class="no-server-view">
+          <p>Create or join a server to get started.</p>
         </div>
-        <ul id="channel-list"></ul>
+
+        <!-- Channel area (shown when server selected) -->
+        <div id="server-channel-area" class="hidden">
+
+          <!-- Channels -->
+          <div class="sidebar-section-label">
+            <span>Channels</span>
+            <span class="section-count" id="channel-count">0</span>
+          </div>
+          <ul id="channel-list"></ul>
+
+          <!-- Members -->
+          <div class="sidebar-section-label" style="margin-top:14px;">
+            <span>Members</span>
+          </div>
+          <div id="members-list" class="members-list"></div>
+
+        </div>
 
         <!-- Direct Messages -->
         <div class="sidebar-section-label" style="margin-top:14px;">
@@ -157,7 +194,7 @@
       <div class="chat-header">
         <div class="chat-header-left">
           <span id="channel-title">💬 #general</span>
-          <span id="channel-desc" class="channel-desc">General team discussion</span>
+          <span id="channel-desc" class="channel-desc"></span>
         </div>
         <div class="chat-header-right">
           <div class="header-members">
@@ -172,11 +209,11 @@
         <div class="welcome-banner">
           <div class="welcome-icon-wrap">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="#2563eb"/>
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="#8b5cf6"/>
             </svg>
           </div>
           <h2>Welcome to ChatCorp</h2>
-          <p>Your professional team communication hub. Chat in channels or send direct messages.</p>
+          <p>Create a server or join one to start chatting with your team.</p>
         </div>
       </div>
 
@@ -190,7 +227,7 @@
           </button>
           <textarea
             id="message-input"
-            placeholder="Message #general"
+            placeholder="Select a server to start chatting"
             rows="1"
             autocomplete="off"
             spellcheck="true"
@@ -209,6 +246,66 @@
 
   </div>
 
-  <script type="module" src="app.js" ></script>
+  <!-- ══════════════════════════════════════════
+       CREATE SERVER MODAL
+  ══════════════════════════════════════════ -->
+  <div id="server-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Create a Server</h3>
+        <button id="server-modal-close" class="modal-close-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <p class="modal-desc">Give your server a name. A <strong>#general</strong> channel will be created automatically.</p>
+      <form id="create-server-form" novalidate>
+        <div class="form-group">
+          <label for="server-name-input">Server Name</label>
+          <input type="text" id="server-name-input" placeholder="e.g. Hello World" maxlength="48" required />
+        </div>
+        <p class="auth-error" id="server-create-error"></p>
+        <button type="submit" class="auth-submit" style="margin-top:8px;">Create Server →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       INVITE MODAL
+  ══════════════════════════════════════════ -->
+  <div id="invite-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Invite Members</h3>
+        <button id="invite-modal-close" class="modal-close-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <p class="modal-desc">Search by username to add someone to this server.</p>
+
+      <!-- Hidden trigger used by sidebar invite-btn -->
+      <button id="invite-server-btn" style="display:none;"></button>
+
+      <div class="invite-search-row">
+        <input type="text" id="invite-search-input" placeholder="Username…" maxlength="32" autocomplete="off" />
+        <button id="invite-search-btn" class="invite-search-action">Search</button>
+      </div>
+      <p id="invite-result" class="invite-result"></p>
+      <button id="confirm-invite-btn" class="auth-submit" style="margin-top:4px;padding:9px;">Invite</button>
+
+      <!-- Current members -->
+      <div class="modal-members-section">
+        <p class="modal-members-label">Current Members</p>
+        <div id="modal-members-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>

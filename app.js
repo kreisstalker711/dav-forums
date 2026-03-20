@@ -2,7 +2,7 @@
 // app.js — Main application logic
 // Features: Auth, Channel Chat, Direct Messages (DMs)
 // ============================================================
-
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import {
   auth, db,
   createUserWithEmailAndPassword,
@@ -59,6 +59,8 @@ const userDisplay   = document.getElementById("user-display");
 const userAvatar    = document.getElementById("user-avatar");
 const dmSearchInput = document.getElementById("dm-search");
 const dmSearchBtn   = document.getElementById("dm-search-btn");
+const googleProvider = new GoogleAuthProvider();
+const googleLoginBtn = document.getElementById("google-login");
 
 // ─── AUTH TABS ────────────────────────────────────────────────
 tabLogin.addEventListener("click", () => {
@@ -126,33 +128,62 @@ signupForm.addEventListener("submit", async (e) => {
     btn.disabled = false;
   }
 });
+// ---- google auth------
 
-// ─── LOGOUT ───────────────────────────────────────────────────
-logoutBtn.addEventListener("click", async () => {
-  if (unsubMessages) unsubMessages();
-  await signOut(auth);
-});
+if (googleLoginBtn) {
+  googleLoginBtn.addEventListener("click", async (e) => {
+    e.preventDefault(); // ✅ prevent form submit
 
-// ─── AUTH STATE ───────────────────────────────────────────────
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUser = user;
-    // Ensure user doc exists (for users who signed up before DM feature)
-    const uDoc = await getDoc(doc(db, "users", user.uid));
-    if (!uDoc.exists()) {
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        username: user.displayName || user.email.split("@")[0],
-        email: user.email,
-        createdAt: serverTimestamp(),
-      });
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+
+      // ✅ Create user in Firestore if not exists
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          username: user.displayName || user.email.split("@")[0],
+          email: user.email,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+    } catch (err) {
+      showToast("Google sign-in failed");
+      console.error(err);
     }
-    showApp(user);
-  } else {
-    currentUser = null;
-    showAuth();
-  }
-});
+  });
+}
+
+  // ─── LOGOUT ───────────────────────────────────────────────────
+  logoutBtn.addEventListener("click", async () => {
+    if (unsubMessages) unsubMessages();
+    await signOut(auth);
+  });
+
+  // ─── AUTH STATE ───────────────────────────────────────────────
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      currentUser = user;
+      // Ensure user doc exists (for users who signed up before DM feature)
+      const uDoc = await getDoc(doc(db, "users", user.uid));
+      if (!uDoc.exists()) {
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          username: user.displayName || user.email.split("@")[0],
+          email: user.email,
+          createdAt: serverTimestamp(),
+        });
+      }
+      showApp(user);
+    } else {
+      currentUser = null;
+      showAuth();
+    }
+  });
 
 // ─── SHOW / HIDE SCREENS ─────────────────────────────────────
 function showApp(user) {
